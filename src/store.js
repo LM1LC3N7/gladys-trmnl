@@ -12,6 +12,8 @@
 //   attemptAt  the time of the last reading attempt, written BEFORE the
 //              request, so a container restarting in a loop never reads
 //              faster than the interval;
+//   okAt       the time of the last successful attempt (no key fingerprint),
+//              so a restart right after a success starts "connected";
 //   devices    the displays seen (id, name, friendly id, MAC), so the
 //              Discovery tab is filled again before the first reading.
 //
@@ -30,6 +32,7 @@ export const emptyData = () => ({
   refusal: null,
   pause: null,
   attemptAt: null,
+  okAt: null,
   devices: Object.create(null),
 });
 
@@ -60,6 +63,9 @@ export function sanitize(data, now = Date.now()) {
   if (Number.isFinite(data.attemptAt)) {
     // A time in the future (a clock set back) counts as now.
     base.attemptAt = Math.min(data.attemptAt, now);
+  }
+  if (Number.isFinite(data.okAt)) {
+    base.okAt = Math.min(data.okAt, now);
   }
   if (isObject(data.devices)) {
     for (const [key, d] of Object.entries(data.devices).slice(0, LIMITS.devices)) {

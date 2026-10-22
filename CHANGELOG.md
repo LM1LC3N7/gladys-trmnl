@@ -23,9 +23,10 @@ the notes of the version's GitHub Release.
 - Readings every refresh interval (5 min to 1 h, 15 min by default), never
   faster: Gladys reconnecting, an unchanged configuration, the Discovery and
   test buttons and a container restart add no reading.
-- A key refused by TRMNL is final (kept as an HMAC in `/data`, erased at the
-  first success); 429 and 5xx pause every path, 1 min to 6 h, kept across
-  restarts.
+- A key refused by TRMNL (401) is final (kept as an HMAC in `/data`, erased
+  at the first success); a 403 (maybe the CDN) is retried like any error;
+  429 and 5xx pause every path, 1 min to 6 h, kept across restarts and shown
+  in the status. A restart right after a successful reading starts connected.
 - Status and Discovery published again at every connection to Gladys; a
   device published again keeps every feature of the created one; states
   within a budget of 240 per minute.

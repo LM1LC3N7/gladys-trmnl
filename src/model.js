@@ -2,10 +2,11 @@
 // TRMNL displays -> Gladys devices and states (pure).
 //
 // Units: only those the core lists for the category
-// (`DEVICE_FEATURE_UNITS_BY_CATEGORY`): `percent` for the battery. The
-// battery voltage, the Wi-Fi strength and the RSSI have no unit the core
-// admits for a fitting category: they are `unknown` sensors, the unit in
-// their name. The sleep mode is a read only state; it is changed only by two
+// (`DEVICE_FEATURE_UNITS_BY_CATEGORY`): `percent` for the battery, `volt` for
+// the battery voltage (`energy-sensor/voltage`, never an index). The Wi-Fi
+// strength and the RSSI have no unit the core admits for a fitting category
+// (`signal` is a 0-5 quality): they are `unknown` sensors, the unit in their
+// name. The sleep mode is a read only state; it is changed only by two
 // push buttons, present when allowed in the configuration (never a switch:
 // no "everything off" nor voice assistant reaches them).
 // -----------------------------------------------------------------------------
@@ -19,7 +20,7 @@ import { DEVICE_TYPE, FEATURES, LIMITS } from './constants.js';
 
 const NAMES = {
   [FEATURES.BATTERY]: { en: 'Battery', fr: 'Batterie' },
-  [FEATURES.BATTERY_VOLTAGE]: { en: 'Battery voltage (V)', fr: 'Tension de la batterie (V)' },
+  [FEATURES.BATTERY_VOLTAGE]: { en: 'Battery voltage', fr: 'Tension de la batterie' },
   [FEATURES.WIFI_STRENGTH]: { en: 'Wi-Fi strength (%)', fr: 'Force du Wi-Fi (%)' },
   [FEATURES.RSSI]: { en: 'Wi-Fi signal (dBm)', fr: 'Signal Wi-Fi (dBm)' },
   [FEATURES.SLEEP_MODE]: { en: 'Sleep mode', fr: 'Mode veille' },
@@ -41,8 +42,9 @@ export const SPECS = Object.freeze({
     ...readOnly,
   },
   [FEATURES.BATTERY_VOLTAGE]: {
-    category: C.UNKNOWN,
-    type: T.SENSOR.DECIMAL,
+    category: C.ENERGY_SENSOR,
+    type: T.ENERGY_SENSOR.VOLTAGE,
+    unit: U.VOLT,
     min: 0,
     max: 10,
     keep_history: true,

@@ -108,7 +108,7 @@ test('cleanText bounds and the sleep window', () => {
 test('client: statuses sorted into kinds, the key never in a message', async () => {
   const cases = [
     [401, KINDS.AUTH],
-    [403, KINDS.AUTH],
+    [403, KINDS.HTTP],
     [404, KINDS.NOT_FOUND],
     [429, KINDS.RATE_LIMITED],
     [500, KINDS.UNAVAILABLE],

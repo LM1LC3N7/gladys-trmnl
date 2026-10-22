@@ -42,8 +42,13 @@ export class TrmnlClient {
       return answer.body;
     }
     const retry = retryAfterMs(answer.headers?.get?.('retry-after'), this.now());
-    if (status === 401 || status === 403) {
-      throw new TrmnlError(KINDS.AUTH, `TRMNL refused the API key (${status})`, { status });
+    // Only 401 is a refused key (as the reference): a 403 may come from the
+    // CDN in front of trmnl.com (an HTML challenge page), so it is retried.
+    if (status === 401) {
+      throw new TrmnlError(KINDS.AUTH, 'TRMNL refused the API key (401)', { status });
+    }
+    if (status === 403) {
+      throw new TrmnlError(KINDS.HTTP, 'TRMNL refused the access (403)', { status });
     }
     if (status === 404) {
       throw new TrmnlError(KINDS.NOT_FOUND, 'TRMNL does not know this device (404)', { status });

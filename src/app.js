@@ -68,6 +68,8 @@ export class TrmnlApp {
     this.lastError = undefined;
     this.nextAt = undefined;
     this.retryDelay = 0;
+    /** "ready" restored from /data after a restart, before the first reading. */
+    this.restored = false;
     this.loopHandle = undefined;
     this.flushHandle = undefined;
     /** The reading in flight: { generation, startedAt } or undefined. */
@@ -219,6 +221,7 @@ export class TrmnlApp {
     this.lastError = undefined;
     this.retryDelay = 0;
     this.nextAt = undefined;
+    this.restored = false;
     const first = !this.ranBefore;
     this.ranBefore = true;
     if (!first) {
@@ -246,6 +249,20 @@ export class TrmnlApp {
       return;
     }
     this.phase = 'waiting';
+    // A restart right after a successful reading (the last attempt succeeded,
+    // no refusal, no pause): connected at once, from what /data kept.
+    const okAt = this.data.okAt;
+    if (
+      first &&
+      Number.isFinite(okAt) &&
+      okAt >= (this.data.attemptAt ?? -Infinity) &&
+      !this.data.refusal &&
+      !this.pausedUntil()
+    ) {
+      this.phase = 'ready';
+      this.restored = true;
+      this.lastReadAt = okAt;
+    }
     // The first start of the process (a container restart) waits the whole
     // interval since the last attempt; a key changed later waits the spacing.
     this.plan(this.earliest(first ? this.config.intervalMs : this.timings.attemptSpacing));
@@ -295,6 +312,12 @@ export class TrmnlApp {
       this.logger.warn(
         `TRMNL answered ${err?.status}: paused until ${new Date(until).toISOString()}`,
       );
+      // A pause set by a command shows in the status too; the next reading
+      // comes after it and sets "ready" again on success.
+      if ((this.phase === 'ready' || this.phase === 'waiting') && this.client && !this.inFlight) {
+        this.phase = 'paused';
+        this.plan(this.earliest(this.config.intervalMs));
+      }
       return this.saveNow();
     }
     return Promise.resolve();
@@ -332,6 +355,13 @@ export class TrmnlApp {
     // Written BEFORE the request: a crash during it still counts as an attempt.
     this.data.attemptAt = startedAt;
     await this.saveNow();
+    // The key may have changed during the write: never a request with the old one.
+    if (!this.current(generation, epoch) || client !== this.client) {
+      if (this.inFlight?.generation === generation) {
+        this.inFlight = undefined;
+      }
+      return;
+    }
     let result;
     try {
       result = await client.devices();
@@ -385,11 +415,14 @@ export class TrmnlApp {
     this.lastReadAt = this.now();
     this.retryDelay = 0;
     this.lastError = undefined;
-    if (this.phase !== 'ready') {
+    if (this.phase !== 'ready' || this.restored) {
       this.logger.info(`TRMNL answers: ${devices.length} display(s)`);
     }
     this.phase = 'ready';
-    let changed = false;
+    this.restored = false;
+    // The attempt that succeeded: a restart soon after starts "connected".
+    this.data.okAt = startedAt;
+    let changed = true;
     if (this.data.refusal) {
       this.data.refusal = null;
       changed = true;
@@ -417,6 +450,7 @@ export class TrmnlApp {
    * else is tried again after the interval at least, doubling up to 1 h.
    */
   async failed(err, generation) {
+    this.restored = false;
     if (isKeyRefused(err)) {
       this.phase = 'refused';
       this.halt();
@@ -672,6 +706,9 @@ export class TrmnlApp {
     if (err?.kind === KINDS.NOT_FOUND) {
       return new Error(E.notFound);
     }
+    if (err?.kind === KINDS.HTTP) {
+      return new Error(E.refused(short(err.message)));
+    }
     return new Error(E.notSent(short(err?.message ?? err)));
   }
 
@@ -685,12 +722,7 @@ export class TrmnlApp {
     } catch (err) {
       throw this.readError(err);
     }
-    const differs = (a, b) => a !== undefined && a !== null && b !== undefined && b !== a;
-    if (
-      differs(job.known.mac, fresh.mac) ||
-      differs(job.known.friendlyId, fresh.friendlyId) ||
-      fresh.id !== job.id
-    ) {
+    if (!this.sameDisplay(job.known, fresh, job.id)) {
       throw new Error(E.otherDevice);
     }
     if (fresh.sleepModeEnabled === undefined) {
@@ -741,8 +773,12 @@ export class TrmnlApp {
     } catch (err) {
       if (isBusy(err) || isServerError(err)) {
         this.pause(err).catch(() => {});
+        this.background(() => this.updateStatus());
       }
       throw new Error(E.unconfirmed(short(err?.message ?? err)), { cause: err });
+    }
+    if (!this.sameDisplay(job.known, after, job.id)) {
+      throw new Error(E.unconfirmed('TRMNL answered for another display'));
     }
     if (after.sleepModeEnabled !== job.wanted) {
       throw new Error(E.unconfirmed('TRMNL still shows the previous sleep mode'));
@@ -751,13 +787,36 @@ export class TrmnlApp {
     this.observed(job, after);
   }
 
+  /**
+   * The same display: same id, and no MAC address nor friendly id that
+   * differs from the known one (an unreadable value is not "another display").
+   */
+  sameDisplay(known, fresh, id) {
+    const differs = (a, b) => a !== undefined && a !== null && b !== undefined && b !== a;
+    return (
+      fresh.id === id &&
+      !differs(known.mac, fresh.mac) &&
+      !differs(known.friendlyId, fresh.friendlyId)
+    );
+  }
+
   /** What a command saw: kept and published without holding the ack. */
   observed(job, fresh) {
     if (job.generation !== this.generation) {
       return;
     }
+    // Before the first reading after a restart the table is empty: filled
+    // first from /data, so the other displays stay known.
+    if (this.displays.size === 0) {
+      for (const d of this.knownDisplays()) {
+        this.displays.set(d.id, d);
+      }
+    }
     const before = this.displays.get(job.id) ?? job.known;
-    this.displays.set(job.id, { ...before, ...fresh, name: fresh.name ?? before.name });
+    // Only the values TRMNL gave: a field missing from this answer never
+    // erases a known one (the identity above all).
+    const defined = Object.fromEntries(Object.entries(fresh).filter(([, v]) => v !== undefined));
+    this.displays.set(job.id, { ...before, ...defined });
     this.commandAt.set(job.id, this.now());
     this.background(() => this.publishAllStates());
   }
@@ -850,6 +909,12 @@ export class TrmnlApp {
       case 'failing':
         return { connected: false, message: join(T.failing(this.lastError, next)) };
       case 'ready':
+        if (this.restored) {
+          return {
+            connected: true,
+            message: join(T.restored(this.knownDisplays().length, this.lastReadAt, next)),
+          };
+        }
         return {
           connected: true,
           message: join(T.connected(this.displays.size, this.total, this.lastReadAt)),

@@ -157,8 +157,15 @@ test('a restart waits the interval from the last attempt kept in /data; Discover
   const second = await setup({ store, clock });
   assert.equal(second.api.reads().length, 0, 'no reading at start');
   assert.equal(second.gladys.fake.discoveredDevices.length, 1, 'Discovery from /data');
-  assert.equal(second.gladys.fake.connectionStatus.connected, false);
-  assert.match(second.gladys.fake.connectionStatus.message.en, /first reading is at 12:15 UTC/);
+  // The last attempt succeeded: connected at once (I1).
+  assert.deepEqual(second.gladys.fake.connectionStatus, {
+    connected: true,
+    message: {
+      en: 'Connected: 1 display, last successful reading at 12:00 UTC, next at 12:15 UTC.',
+      fr: 'Connecté : 1 écran(s), dernière lecture réussie à 12:00 UTC, prochaine à 12:15 UTC.',
+    },
+  });
+  assert.equal(store.data.okAt, Date.UTC(2026, 9, 18, 12, 0, 0));
   await clock.advance(INTERVAL - 120_000 - 1);
   assert.equal(second.api.reads().length, 0);
   await clock.advance(1);
@@ -430,12 +437,173 @@ test('a write without answer, or not read back: "sent, without confirmation"', a
 test('a refused key on a command does not stop the readings', async () => {
   const api = createFakeTrmnl();
   const { gladys, clock } = await setup({ config: { allow_sleep_mode: true }, api });
-  api.next.push(undefined, () => answer(403, { error: 'forbidden' }));
-  const ack = await press(gladys, 'sleep_mode_on');
+  api.next.push(undefined, () => answer(401, { error: 'Invalid API key' }));
+  let ack = await press(gladys, 'sleep_mode_on');
   assert.match(ack.error, /refused the API key for this change/);
+  // A 403 on a command: refused, nothing changed.
+  api.next.push(undefined, () => answer(403, '<html>Attention Required! | Cloudflare</html>'));
+  ack = await press(gladys, 'sleep_mode_on');
+  assert.match(
+    ack.error,
+    /refused the change \(TRMNL refused the access \(403\)\): nothing changed/,
+  );
   await clock.advance(INTERVAL);
   assert.equal(api.reads().length, 2);
   assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
+test('a restart after a failed last attempt does not claim "connected"', async () => {
+  const store = new MemoryStore();
+  const clock = fakeClock();
+  const first = await setup({ store, clock });
+  first.api.next.push(noAnswer);
+  await clock.advance(INTERVAL);
+  assert.equal(first.gladys.fake.connectionStatus.connected, false);
+  await first.app.stop();
+  const second = await setup({ store, clock });
+  assert.equal(second.gladys.fake.connectionStatus.connected, false);
+  assert.match(second.gladys.fake.connectionStatus.message.en, /first reading is at/);
+});
+
+test('a 403 of a reading (CDN page) is not a refused key: tried again, then doubling (I2)', async () => {
+  const store = new MemoryStore();
+  const api = createFakeTrmnl();
+  api.next.push(() =>
+    answer(403, '<html><title>Attention Required! | Cloudflare</title></html>', {
+      'Content-Type': 'text/html',
+      Server: 'cloudflare',
+    }),
+  );
+  const { gladys, clock } = await setup({ api, store });
+  assert.equal(store.data.refusal, null);
+  assert.match(gladys.fake.connectionStatus.message.en, /refused the access \(403\)/);
+  assert.doesNotMatch(gladys.fake.connectionStatus.message.en, /API key/);
+  await clock.advance(INTERVAL);
+  assert.equal(api.reads().length, 2);
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
+test('a command before the first reading after a restart keeps the other displays (I3)', async () => {
+  const store = new MemoryStore();
+  const clock = fakeClock();
+  const api = createFakeTrmnl({ devices: [display(1), display(2)] });
+  const created = [1, 2].map((id) =>
+    buildDevice(ids, parseDeviceRecord(display(id)), { buttons: true }),
+  );
+  const config = { allow_sleep_mode: true };
+  const first = await setup({ store, clock, api, devices: created, config });
+  await first.app.stop();
+  const second = await setup({ store, clock, api, devices: created, config });
+  for (const device of created) {
+    const ack = await second.gladys.fake.setValue(device, feature(device, 'sleep_mode_on'), 1);
+    assert.equal(ack.success, true, ack.error);
+  }
+  await second.app.start(await second.gladys.getConfig(), { connected: true });
+  assert.deepEqual(
+    second.gladys.fake.discoveredDevices.map((d) => d.external_id),
+    [`ext:${SELECTOR}:device:1`, `ext:${SELECTOR}:device:2`],
+  );
+  assert.equal(api.reads().length, 1, 'still no reading before the interval');
+});
+
+test('identity: an answer without MAC keeps the known one; a read back of another display is not a confirmation (M1)', async () => {
+  const api = createFakeTrmnl();
+  const { gladys } = await setup({ config: { allow_sleep_mode: true }, api });
+  // The read back has no MAC nor friendly id: confirmed, the known ones kept.
+  api.next.push(undefined, undefined, () =>
+    answer(200, {
+      data: display(42793, { sleep_mode_enabled: true, mac_address: null, friendly_id: null }),
+    }),
+  );
+  let ack = await press(gladys, 'sleep_mode_on');
+  assert.equal(ack.success, true, ack.error);
+  // Next press: TRMNL answers for another display: nothing written.
+  api.next.push(() =>
+    answer(200, {
+      data: display(42793, { mac_address: '00:11:22:33:44:55', friendly_id: 'ZZZZZZ' }),
+    }),
+  );
+  const patches = api.patches().length;
+  ack = await press(gladys, 'sleep_mode_off');
+  assert.match(ack.error, /another display/);
+  assert.equal(api.patches().length, patches);
+  // The read back after the PATCH comes from another display: not confirmed.
+  api.next.push(undefined, undefined, () =>
+    answer(200, {
+      data: display(42793, { sleep_mode_enabled: false, mac_address: '00:11:22:33:44:55' }),
+    }),
+  );
+  ack = await press(gladys, 'sleep_mode_off');
+  assert.match(
+    ack.error,
+    /^Command sent, without confirmation \(TRMNL answered for another display\)/,
+  );
+});
+
+test('a key changed while attemptAt is written: never a request with the old key (M2)', async () => {
+  const store = new MemoryStore();
+  let release;
+  let hold = new Promise((resolve) => {
+    release = resolve;
+  });
+  const save = store.save.bind(store);
+  store.save = async (data) => {
+    await save(data);
+    if (data.attemptAt && hold) {
+      const wait = hold;
+      hold = undefined;
+      await wait;
+    }
+  };
+  const api = createFakeTrmnl();
+  const { gladys, clock } = await setup({ api, store, start: false });
+  await gladys.connect();
+  await clock.advance(0);
+  // The reading is held in the write of attemptAt: the key changes meanwhile.
+  assert.equal(api.requests.length, 0);
+  await gladys.fake.configUpdated({ ...gladys.fake.config, api_key: OTHER_KEY });
+  release();
+  await clock.settle();
+  assert.equal(api.requests.length, 0, 'the old key never leaves');
+  await clock.advance(TIMINGS.attemptSpacing);
+  assert.equal(api.requests.length, 1);
+  assert.equal(api.requests[0].headers.Authorization, `Bearer ${OTHER_KEY}`);
+});
+
+test('a pause set by a command shows in the status (M3)', async () => {
+  const api = createFakeTrmnl();
+  const { gladys, clock } = await setup({ config: { allow_sleep_mode: true }, api });
+  api.next.push(() => answer(503, 'down'));
+  const ack = await press(gladys, 'sleep_mode_on');
+  assert.match(ack.error, /slow down or is in trouble/);
+  await clock.settle();
+  assert.equal(gladys.fake.connectionStatus.connected, false);
+  assert.match(
+    gladys.fake.connectionStatus.message.en,
+    /in trouble \(503\): paused until 12:05 UTC/,
+  );
+  await clock.advance(INTERVAL);
+  assert.equal(api.reads().length, 2);
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
+test('the battery voltage is an energy-sensor voltage in volts (M4)', async () => {
+  const { gladys } = await setup();
+  const voltage = feature(gladys.fake.discoveredDevices[0], 'battery_voltage');
+  assert.deepEqual(
+    [voltage.category, voltage.type, voltage.unit],
+    ['energy-sensor', 'voltage', 'volt'],
+  );
+});
+
+test('the refused key text asks for a new key, saving the same one does nothing (M7)', async () => {
+  const api = createFakeTrmnl({ key: OTHER_KEY });
+  const { gladys, clock } = await setup({ api });
+  assert.match(gladys.fake.connectionStatus.message.en, /Paste a new key/);
+  assert.match(gladys.fake.connectionStatus.message.fr, /Collez une nouvelle clé/);
+  await gladys.fake.configUpdated({ ...gladys.fake.config });
+  await clock.advance(INTERVAL);
+  assert.equal(api.reads().length, 1);
 });
 
 test('another display under the same id (MAC differs): nothing written', async () => {

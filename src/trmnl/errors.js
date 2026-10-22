@@ -8,7 +8,7 @@ export const KINDS = Object.freeze({
   UNREACHABLE: 'unreachable',
   /** The request may have reached TRMNL but no answer came in time. */
   NO_ANSWER: 'no_answer',
-  /** 401 or 403: the API key is refused. */
+  /** 401: the API key is refused (a 403 is HTTP: maybe the CDN, retried). */
   AUTH: 'auth',
   /** 404 (a display that is not, or no longer, in the account). */
   NOT_FOUND: 'not_found',

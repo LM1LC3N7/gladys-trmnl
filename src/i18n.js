@@ -28,9 +28,14 @@ export const T = {
     'La clé d’API contient un espace ou un caractère invisible : collez-la de nouveau, sans rien autour.',
   ),
   refused: both(
-    'TRMNL refused the API key (401/403): nothing is tried again on its own. Paste the key of your account again (trmnl.com, Account), or press "Test the connection" once the refresh interval has passed.',
-    'TRMNL a refusé la clé d’API (401/403) : rien n’est retenté seul. Collez de nouveau la clé de votre compte (trmnl.com, Account), ou appuyez sur « Tester la connexion » une fois l’intervalle de rafraîchissement écoulé.',
+    'TRMNL refused the API key (401): nothing is tried again on its own. Paste a new key (generated again on trmnl.com, Account), or press "Test the connection" once the refresh interval has passed.',
+    'TRMNL a refusé la clé d’API (401) : rien n’est retenté seul. Collez une nouvelle clé (régénérée sur trmnl.com, Account), ou appuyez sur « Tester la connexion » une fois l’intervalle de rafraîchissement écoulé.',
   ),
+  restored: (count, at, next) =>
+    both(
+      `Connected: ${count} display${count === 1 ? '' : 's'}, last successful reading at ${clock(at)}, next at ${clock(next)}.`,
+      `Connecté : ${count} écran(s), dernière lecture réussie à ${clock(at)}, prochaine à ${clock(next)}.`,
+    ),
   paused: (until, reason) =>
     reason === 'busy'
       ? both(

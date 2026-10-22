@@ -48,9 +48,14 @@ gives no "last contact" time of a display: it is not shown.
 - 429 (TRMNL asks to slow down) or 5xx: a pause of what TRMNL asks, else 15
   or 5 minutes, between 1 minute and 6 hours, kept across restarts. No
   reading and no command during the pause.
-- **Key refused** (401 or 403): no automatic try any more, restarts included.
-  Paste the right key, or press "Test the connection" once the interval has
-  passed: the refusal is erased only by a successful reading.
+- **Key refused** (401): no automatic try any more, restarts included. Paste
+  a new key (generated again on trmnl.com; saving the same key again does
+  nothing), or press "Test the connection" once the interval has passed: the
+  refusal is erased only by a successful reading. A 403 (it may come from the
+  network protecting trmnl.com) is not a refusal of the key: tried again like
+  any other error.
+- After a restart that follows a successful reading, the integration shows
+  "connected" at once, until the next reading.
 
 ## Sleep mode buttons (off by default)
 

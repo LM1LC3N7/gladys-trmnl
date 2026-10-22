@@ -54,8 +54,8 @@ up to date at the end of every milestone.
   of app, store, config, i18n, handlers, tests); the loop, refusal and
   commands follow LM1LC3N7/gladys-uptimerobot (cloud API key).
 - Cloud only (`transports: ["cloud"]`), `categories: ["multimedia"]`, Gladys
-  > = 5.1.0 like the sibling modules. No Bluetooth, no local API (TRMNL
-  > devices have none documented).
+  5.1.0 or later like the sibling modules. No Bluetooth, no local API (TRMNL
+  devices have none documented).
 - Version 0.1.0 in `package.json`, `package-lock.json`, the manifest and the
   `docker_image` tag, set by hand at milestone 1: the one exception to
   "versions belong to the Release workflow", because the template's 1.0.0 and
@@ -67,8 +67,10 @@ up to date at the end of every milestone.
   is read again: a MAC address or a friendly id that differs from the known
   one refuses the command ("another display"); an unreadable one does not.
 - **Devices**: battery (`battery/integer`, `percent`, from
-  `percent_charged`, rounded), battery voltage (`unknown/decimal`, V in the
-  name: no core category admits volts for a battery), Wi-Fi strength
+  `percent_charged`, rounded), battery voltage (`energy-sensor/voltage`,
+  `volt`, as gladys-blebox and gladys-blue-current; a voltage, never an
+  index: set before the first release, category and unit are frozen at
+  creation), Wi-Fi strength
   (`unknown/integer` 0-100), RSSI (`unknown/integer` -150-0, dBm in the name;
   the core `signal` category is a 0-5 link quality), sleep mode
   (`unknown/binary`, read only), sleep hours (`text`, "22:00-08:00"). Units
@@ -86,8 +88,13 @@ up to date at the end of every milestone.
   the value read back equals the one asked, else "Command sent, without
   confirmation". A request that never reached TRMNL says "nothing sent". The
   ack never waits for the publication of the new state. A 401/403 on a
-  command does not stop the readings; a 429/5xx pauses everything. A reading
-  in flight during a command keeps the command's value.
+  command does not stop the readings (403: "refused, nothing changed"); a
+  429/5xx pauses everything and the status says so. A reading in flight
+  during a command keeps the command's value. The value read back after the
+  PATCH must come from the same display (identity checked as before),
+  otherwise "sent, without confirmation"; a field missing from an answer never
+  erases a known one; before the first reading after a restart, a command
+  fills the table from `/data` first (the other displays stay known).
 - **Readings**: one `GET /api/devices` (30 displays at most, 256 KB per
   answer) every interval (default 15 min, 5 min to 1 h). The time of the
   attempt is written to `/data` before the request (attempts are at least
@@ -100,10 +107,18 @@ up to date at the end of every milestone.
 - Errors: tried again after the interval, then doubling, up to 1 h. 429 and
   5xx: a pause of Retry-After, else 15 / 5 min, bounded 1 min to 6 h, kept in
   `/data` with its reason and bounded when read back; nothing read or sent
-  during it, even after a restart. 401/403 of a reading: final, kept as
+  during it, even after a restart. 401 of a reading: final, kept as
   HMAC-SHA256 of the key with a random salt of `/data`; never tried alone,
   not after a restart; a new key, or the test button once the interval
-  passed, tries again; erased only by a successful reading.
+  passed, tries again; erased only by a successful reading. A 403 is not
+  final (trmnl.com is behind Cloudflare, whose challenge pages answer 403;
+  the reference treats only 401 as an authentication error): "failing",
+  tried again after the interval, then doubling.
+- `okAt` (time of the last successful attempt, no key fingerprint) is kept in
+  `/data`: a restart whose last attempt succeeded, without refusal nor pause,
+  starts "ready" (connected, "last successful reading at X, next at Y").
+- The generation is checked again between the write of `attemptAt` and the
+  request: a key changed during the write never sends the old one.
 - `/data/trmnl.json`: salt, refusal HMAC, pause, last attempt, displays (id,
   name, friendly id, MAC) so the Discovery tab is filled before the first
   reading after a restart (dropped when the key changes). Atomic writes, 0600,

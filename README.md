@@ -26,11 +26,14 @@ Gladys ⇄ SDK ⇄ src/handlers.js ⇄ src/app.js (TrmnlApp)
   Bearer token, every refresh interval (15 min by default), never faster:
   the time of the last attempt is written to `/data` before each request.
   Errors wait the interval, then double up to 1 h; 429/5xx pause every path
-  (1 min to 6 h, kept in `/data`); a refused key (401/403) is final, kept as
-  an HMAC, retried only by a new key or the test button.
+  (1 min to 6 h, kept in `/data`); a refused key (401) is final, kept as an
+  HMAC, retried only by a new key or the test button; a 403 (maybe the CDN)
+  is retried like any error. A restart right after a successful reading starts
+  connected (`okAt` in `/data`).
 - **Devices**: `device:<TRMNL id>` per display: battery (`battery`,
-  `percent`), battery voltage, Wi-Fi strength, RSSI (`unknown` sensors, the
-  unit in the name), sleep mode (read-only binary), sleep hours (text).
+  `percent`), battery voltage (`energy-sensor/voltage`, `volt`), Wi-Fi
+  strength, RSSI (`unknown` sensors, the unit in the name), sleep mode
+  (read-only binary), sleep hours (text).
 - **Commands**: two push buttons per display, only when
   `allow_sleep_mode` is on: state read again (identity checked), option
   checked again right before the `PATCH`, confirmed by a value read back,

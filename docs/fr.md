@@ -50,9 +50,14 @@ donne pas l'heure du dernier contact d'un écran : elle n'est pas affichée.
 - 429 (TRMNL demande de ralentir) ou 5xx : pause de la durée demandée, sinon
   15 ou 5 minutes, entre 1 minute et 6 heures, gardée même après un
   redémarrage. Ni lecture ni commande pendant la pause.
-- **Clé refusée** (401 ou 403) : plus aucun essai automatique, même après un
-  redémarrage. Collez la bonne clé, ou appuyez sur « Tester la connexion »
-  une fois l'intervalle écoulé : le refus n'est effacé qu'après une lecture
+- Après un redémarrage qui suit une lecture réussie, l'intégration est
+  « connectée » tout de suite, jusqu'à la lecture suivante.
+- Un 403 (il peut venir du réseau qui protège trmnl.com) n'est pas un refus
+  de la clé : nouvel essai comme pour toute autre erreur.
+- **Clé refusée** (401) : plus aucun essai automatique, même après un
+  redémarrage. Collez une nouvelle clé (régénérée sur trmnl.com ;
+  réenregistrer la même clé ne fait rien), ou appuyez sur « Tester la
+  connexion » une fois l'intervalle écoulé : le refus n'est effacé qu'après une lecture
   réussie.
 
 ## Boutons du mode veille (désactivés par défaut)
