@@ -1,45 +1,40 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// The configuration: the manifest `config_schema` values, normalized so the
+// rest of the code never deals with strings typed in a form.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
-export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+import { REFRESH_INTERVALS } from './constants.js';
+
+/** Defaults, mirrored by the manifest (checked by test/manifest.test.js). */
+export const DEFAULT_CONFIG = Object.freeze({
+  refresh_interval: '900',
+  allow_sleep_mode: false,
+  language: 'fr',
+});
+
+/** What the API key may hold: printable ASCII, no space. */
+const KEY_PATTERN = /^[\x21-\x7e]{1,200}$/;
+
+const bool = (value, fallback) => {
+  if (value === true || value === 'true' || value === 1 || value === '1') return true;
+  if (value === false || value === 'false' || value === 0 || value === '0') return false;
+  return fallback;
 };
 
-/**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
- */
 export function normalizeConfig(raw = {}) {
+  const c = raw && typeof raw === 'object' ? raw : {};
+  const apiKey = typeof c.api_key === 'string' ? c.api_key.trim() : '';
+  const interval = REFRESH_INTERVALS.includes(String(c.refresh_interval))
+    ? String(c.refresh_interval)
+    : DEFAULT_CONFIG.refresh_interval;
+  const invalid = apiKey !== '' && !KEY_PATTERN.test(apiKey);
   return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+    apiKey,
+    /** An invisible character pasted with the key: said to the user, never sent. */
+    apiKeyInvalid: invalid,
+    ready: apiKey !== '' && !invalid,
+    intervalMs: Number(interval) * 1000,
+    allowSleepMode: bool(c.allow_sleep_mode, DEFAULT_CONFIG.allow_sleep_mode),
+    language: c.language === 'en' ? 'en' : 'fr',
   };
 }

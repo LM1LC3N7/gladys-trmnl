@@ -1,67 +1,88 @@
-# Template de démonstration
+# TRMNL
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Amène dans Gladys les écrans e-ink [TRMNL](https://trmnl.com) de votre
+compte, par l'API de compte officielle de TRMNL : batterie, Wi-Fi et mode
+veille de chaque écran.
+
+> **Jamais testé avec un vrai appareil.** Cette intégration a été écrite à
+> partir du client Python `trmnl` (celui de l'intégration Home Assistant) et
+> testée seulement contre une API TRMNL simulée. Non officielle, sans lien
+> avec TRMNL.
 
 ## Ce que vous obtenez
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+Un appareil par écran (onglet Découverte), identifié par son numéro TRMNL :
 
-## Configuration
+- **Batterie** (%), et **tension de la batterie** (V) ;
+- **Force du Wi-Fi** (0 à 100, comme TRMNL la note) et **signal Wi-Fi**
+  (dBm) ;
+- **Mode veille** (activé ou non) et **heures de veille** (par exemple
+  `22:00-08:00`, à l'heure de votre compte TRMNL) ;
+- en option, deux **boutons** : « Activer le mode veille » et « Désactiver
+  le mode veille » (voir plus bas).
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+Ce que l'écran affiche (playlists, plugins) reste géré dans TRMNL. L'API ne
+donne pas l'heure du dernier contact d'un écran : elle n'est pas affichée.
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+## Mise en route
 
-## Actions
+1. Sur [trmnl.com](https://trmnl.com), ouvrez **Account** et copiez la
+   **API key** de votre compte (elle commence par `user_`).
+2. Dans Gladys, ouvrez cette intégration, collez la clé et enregistrez. La
+   clé est gardée par Gladys dans sa base, jamais réaffichée, et envoyée
+   seulement à trmnl.com, dans l'en-tête `Authorization` des requêtes.
+3. Vos écrans apparaissent dans l'onglet Découverte : créez ceux que vous
+   voulez.
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+## Rythme de lecture
 
-## Scènes
+- Une requête pour tous les écrans, à chaque intervalle de rafraîchissement
+  (15 minutes par défaut, de 5 minutes à 1 heure). Un écran donne sa
+  batterie et son signal quand il se réveille : lire plus souvent montre
+  rarement plus.
+- **Jamais plus vite que l'intervalle** : ni la reconnexion de Gladys, ni un
+  enregistrement de la configuration sans changement, ni le bouton
+  Découverte, ni « Tester la connexion », ni un redémarrage du conteneur
+  (l'heure du dernier essai est gardée) n'ajoutent de lecture. Une nouvelle
+  clé est essayée une minute au plus après le dernier essai.
+- En cas d'erreur, nouvel essai après l'intervalle, puis le double, jusqu'à
+  1 heure.
+- 429 (TRMNL demande de ralentir) ou 5xx : pause de la durée demandée, sinon
+  15 ou 5 minutes, entre 1 minute et 6 heures, gardée même après un
+  redémarrage. Ni lecture ni commande pendant la pause.
+- **Clé refusée** (401 ou 403) : plus aucun essai automatique, même après un
+  redémarrage. Collez la bonne clé, ou appuyez sur « Tester la connexion »
+  une fois l'intervalle écoulé : le refus n'est effacé qu'après une lecture
+  réussie.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+## Boutons du mode veille (désactivés par défaut)
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+Cochez « Autoriser le changement du mode veille des écrans » dans la
+configuration. Chaque écran reçoit alors deux boutons (jamais un
+interrupteur : ni assistant vocal ni « tout éteindre » ne peut les
+atteindre). Chaque appui :
 
-## Tableau de bord
+1. relit l'écran chez TRMNL (et vérifie que c'est le même écran : adresse
+   MAC et identifiant) ; s'il est déjà dans le mode demandé, rien n'est
+   envoyé ;
+2. revérifie que l'option est toujours cochée, puis change le mode veille ;
+3. relit l'écran : la commande n'est dite réussie que si TRMNL montre la
+   nouvelle valeur. Sinon : « Commande envoyée, sans confirmation » (la
+   prochaine lecture montrera le mode réel).
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Rien n'est envoyé au-delà de 3,5 secondes après l'appui (Gladys attend 5
+secondes), ni pendant une pause 429/5xx ; 6 commandes par minute au plus.
 
-## Dépannage
+## Questions aux testeurs
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+Si vous avez un écran TRMNL, dites-nous (forum, ou un ticket sur GitHub) :
+la batterie, la tension et le signal correspondent-ils à ce que montre
+trmnl.com ? Les boutons du mode veille agissent-ils sur l'écran ?
+
+## Données et vie privée
+
+L'intégration ne parle qu'à trmnl.com. Elle garde dans son volume `/data` :
+une clé aléatoire, l'empreinte (HMAC) d'une clé refusée (effacée au premier
+succès ; jamais d'empreinte d'une clé qui marche), la fin d'une pause, l'heure
+du dernier essai, et la liste des écrans (numéro, nom, identifiant, adresse
+MAC). Elle ne lit pas votre profil (nom, e-mail).

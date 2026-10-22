@@ -1,177 +1,110 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "TRMNL",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "TRMNL e-ink displays: battery, Wi-Fi signal and sleep mode of each display.",
+    "fr": "Écrans e-ink TRMNL : batterie, signal Wi-Fi et mode veille de chaque écran."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-trmnl:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-trmnl/main/cover.png",
+  "categories": ["multimedia"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": { "en": "Your TRMNL account", "fr": "Votre compte TRMNL" },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Brings the TRMNL e-ink displays of your account into Gladys, through the official TRMNL account API (trmnl.com) and the API key of your account: for each display its battery (charge and voltage), its Wi-Fi strength and signal, its sleep mode and sleep hours. Read every refresh interval, never faster. Optional buttons turn the sleep mode on or off (off by default, see below). What the screen shows (playlists, plugins) stays in TRMNL. Never tested with a real device. Unofficial, not affiliated with TRMNL.",
+        "fr": "Amène dans Gladys les écrans e-ink TRMNL de votre compte, par l'API de compte officielle de TRMNL (trmnl.com) et la clé d'API de votre compte : pour chaque écran sa batterie (charge et tension), la force et le signal de son Wi-Fi, son mode veille et ses heures de veille. Lu à chaque intervalle de rafraîchissement, jamais plus vite. Des boutons facultatifs activent ou désactivent le mode veille (désactivés par défaut, voir plus bas). Ce que l'écran affiche (playlists, plugins) reste dans TRMNL. Jamais testé avec un vrai appareil. Non officiel, sans lien avec TRMNL."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/LM1LC3N7/gladys-trmnl/blob/main/docs/fr.md",
+          "label": { "en": "Guide (French)", "fr": "Guide (français)" }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-trmnl/blob/main/docs/en.md",
+          "label": { "en": "Guide (English)", "fr": "Guide (anglais)" }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
+      "key": "api_key",
+      "type": "secret",
+      "label": { "en": "API key of your account", "fr": "Clé d'API de votre compte" },
       "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+        "en": "On trmnl.com, Account, the \"API key\" of your account (it starts with user_). Kept by Gladys in its database, never shown again, sent only to trmnl.com, in the Authorization header of the requests.",
+        "fr": "Sur trmnl.com, Account, la « API key » de votre compte (elle commence par user_). Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à trmnl.com, dans l'en-tête Authorization des requêtes."
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "placeholder": { "en": "user_...", "fr": "user_..." },
+      "required": true
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "refresh_interval",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
+      "label": { "en": "Refresh", "fr": "Rafraîchissement" },
+      "description": {
+        "en": "How often Gladys reads TRMNL (one request for all the displays). A display reports its battery and signal when it wakes up, often every 15 minutes: reading more often rarely shows more.",
+        "fr": "À quel rythme Gladys lit TRMNL (une requête pour tous les écrans). Un écran donne sa batterie et son signal quand il se réveille, souvent toutes les 15 minutes : lire plus souvent montre rarement plus."
+      },
+      "required": true,
+      "default": "900",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        { "value": "300", "label": { "en": "Every 5 minutes", "fr": "Toutes les 5 minutes" } },
+        { "value": "600", "label": { "en": "Every 10 minutes", "fr": "Toutes les 10 minutes" } },
+        { "value": "900", "label": { "en": "Every 15 minutes", "fr": "Toutes les 15 minutes" } },
+        { "value": "1800", "label": { "en": "Every 30 minutes", "fr": "Toutes les 30 minutes" } },
+        { "value": "3600", "label": { "en": "Every hour", "fr": "Toutes les heures" } }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": { "en": "Language of the names", "fr": "Langue des noms" },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Used for the names of the features added from now on.",
+        "fr": "Sert aux noms des fonctionnalités ajoutées désormais."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        { "value": "fr", "label": { "en": "French", "fr": "Français" } },
+        { "value": "en", "label": { "en": "English", "fr": "Anglais" } }
+      ]
+    },
+    {
+      "key": "commands_section",
+      "type": "section",
+      "label": { "en": "Sleep mode buttons", "fr": "Boutons du mode veille" },
+      "description": {
+        "en": "By default Gladys only reads. Once allowed below, each display gets two buttons, \"Turn the sleep mode on\" and \"Turn the sleep mode off\" (never a switch: no voice assistant nor \"turn everything off\" can reach them). Each press reads the display first, changes its sleep mode in your TRMNL account, then reads it back: it is said done only when TRMNL shows the new value.",
+        "fr": "Par défaut Gladys ne fait que lire. Une fois autorisé ci-dessous, chaque écran reçoit deux boutons, « Activer le mode veille » et « Désactiver le mode veille » (jamais un interrupteur : ni assistant vocal ni « tout éteindre » ne peut les atteindre). Chaque appui lit d'abord l'écran, change son mode veille dans votre compte TRMNL, puis le relit : il n'est dit fait que lorsque TRMNL montre la nouvelle valeur."
+      }
+    },
+    {
+      "key": "allow_sleep_mode",
+      "type": "boolean",
+      "label": {
+        "en": "Allow changing the sleep mode of the displays",
+        "fr": "Autoriser le changement du mode veille des écrans"
+      },
+      "required": false,
+      "default": false
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
+      "key": "test_connection",
+      "label": { "en": "Test the connection", "fr": "Tester la connexion" },
+      "description": {
+        "en": "Reads TRMNL now (even after a refused key), unless it was read less than one refresh interval ago or TRMNL asked to slow down: then it says when the next reading is.",
+        "fr": "Lit TRMNL maintenant (même après une clé refusée), sauf s'il a été lu il y a moins d'un intervalle de rafraîchissement ou si TRMNL a demandé de ralentir : il dit alors quand a lieu la prochaine lecture."
+      },
       "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
-    }
-  ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
-      "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
-      },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
-        }
-      ],
-      "variables": [
-        {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
-        }
-      ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
     }
   ]
 }

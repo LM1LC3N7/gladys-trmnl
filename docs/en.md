@@ -1,61 +1,85 @@
-# Demo Devices Template
+# TRMNL
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Brings the [TRMNL](https://trmnl.com) e-ink displays of your account into
+Gladys, through the official TRMNL account API: battery, Wi-Fi and sleep mode
+of each display.
+
+> **Never tested with a real device.** This integration was written from the
+> `trmnl` Python client (the one of the Home Assistant integration) and
+> tested against a simulated TRMNL API only. Unofficial, not affiliated with
+> TRMNL.
 
 ## What you get
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+One device per display (Discovery tab), keyed by its TRMNL id:
 
-## Configuration
+- **Battery** (%), and **battery voltage** (V);
+- **Wi-Fi strength** (0 to 100, as TRMNL rates it) and **Wi-Fi signal**
+  (dBm);
+- **Sleep mode** (on or off) and **sleep hours** (for example
+  `22:00-08:00`, in the time zone of your TRMNL account);
+- as an option, two **buttons**: "Turn the sleep mode on" and "Turn the
+  sleep mode off" (see below).
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+What the screen shows (playlists, plugins) stays managed in TRMNL. The API
+gives no "last contact" time of a display: it is not shown.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Getting started
 
-## Actions
+1. On [trmnl.com](https://trmnl.com), open **Account** and copy the **API
+   key** of your account (it starts with `user_`).
+2. In Gladys, open this integration, paste the key and save. The key is kept
+   by Gladys in its database, never shown again, and sent only to trmnl.com,
+   in the `Authorization` header of the requests.
+3. Your displays appear in the Discovery tab: create the ones you want.
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+## How often it reads
 
-## Scenes
+- One request for all the displays, every refresh interval (15 minutes by
+  default, from 5 minutes to 1 hour). A display reports its battery and
+  signal when it wakes up: reading more often rarely shows more.
+- **Never faster than the interval**: neither Gladys reconnecting, nor a
+  configuration saved unchanged, nor the Discovery button, nor "Test the
+  connection", nor a restart of the container (the time of the last attempt
+  is kept) adds a reading. A new key is tried one minute at most after the
+  last attempt.
+- After an error, a new try after the interval, then twice that, up to
+  1 hour.
+- 429 (TRMNL asks to slow down) or 5xx: a pause of what TRMNL asks, else 15
+  or 5 minutes, between 1 minute and 6 hours, kept across restarts. No
+  reading and no command during the pause.
+- **Key refused** (401 or 403): no automatic try any more, restarts included.
+  Paste the right key, or press "Test the connection" once the interval has
+  passed: the refusal is erased only by a successful reading.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+## Sleep mode buttons (off by default)
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+Tick "Allow changing the sleep mode of the displays" in the configuration.
+Each display then gets two buttons (never a switch: no voice assistant nor
+"turn everything off" can reach them). Each press:
 
-## Dashboard
+1. reads the display from TRMNL again (and checks it is the same display:
+   MAC address and friendly id); when it already is in the mode asked,
+   nothing is sent;
+2. checks again that the option is still ticked, then changes the sleep
+   mode;
+3. reads the display back: the command is said done only when TRMNL shows
+   the new value. Otherwise: "Command sent, without confirmation" (the next
+   reading shows the real mode).
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+Nothing is sent later than 3.5 seconds after the press (Gladys waits 5
+seconds), nor during a 429/5xx pause; 6 commands per minute at most.
 
-## Troubleshooting
+## Questions to testers
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+If you own a TRMNL display, tell us (forum, or a GitHub issue): do the
+battery, voltage and signal match what trmnl.com shows? Do the sleep mode
+buttons act on the display?
+
+## Data and privacy
+
+The integration only talks to trmnl.com. It keeps in its `/data` volume: a
+random key, the fingerprint (HMAC) of a refused key (erased at the first
+success; never a fingerprint of a key that works), the end of a pause, the
+time of the last attempt, and the list of displays (id, name, friendly id,
+MAC address). It does not read your profile (name, e-mail).
