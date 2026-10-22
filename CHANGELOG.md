@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-22
+
 ### Added
 
 - TRMNL displays through the official TRMNL account API (`/api/devices`) and
@@ -32,4 +34,5 @@ the notes of the version's GitHub Release.
   within a budget of 240 per minute.
 - `LICENSE` (Apache-2.0) and `THIRD_PARTY_NOTICES.md`, copied into the image.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-trmnl/commits/main
+[Unreleased]: https://github.com/LM1LC3N7/gladys-trmnl/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-trmnl/releases/tag/v0.1.1

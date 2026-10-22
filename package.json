@@ -1,6 +1,6 @@
 {
   "name": "gladys-trmnl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Gladys Assistant external integration for TRMNL e-ink displays, through the official TRMNL account API: battery, Wi-Fi signal and sleep mode of each display, and optional buttons that turn the sleep mode on or off. Unofficial, not affiliated with TRMNL.",
   "type": "module",

@@ -6,8 +6,8 @@
     "en": "TRMNL e-ink displays: battery, Wi-Fi signal and sleep mode of each display.",
     "fr": "Écrans e-ink TRMNL : batterie, signal Wi-Fi et mode veille de chaque écran."
   },
-  "version": "0.1.0",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-trmnl:0.1.0",
+  "version": "0.1.1",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-trmnl:0.1.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-trmnl/main/cover.png",
   "categories": ["multimedia"],
