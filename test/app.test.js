@@ -606,6 +606,41 @@ test('the refused key text asks for a new key, saving the same one does nothing 
   assert.equal(api.reads().length, 1);
 });
 
+test('a restart after a key change never claims "connected" from the old key (R1)', async () => {
+  const store = new MemoryStore();
+  const clock = fakeClock();
+  const api = createFakeTrmnl();
+  const first = await setup({ store, clock, api });
+  assert.ok(store.data.okAt);
+  await clock.advance(10_000);
+  await first.gladys.fake.configUpdated({ ...first.gladys.fake.config, api_key: OTHER_KEY });
+  assert.equal(store.data.okAt, null);
+  assert.deepEqual(Object.keys(store.data.devices), []);
+  await first.app.stop();
+  const second = await setup({ store, clock, api, config: { api_key: OTHER_KEY } });
+  assert.equal(second.gladys.fake.connectionStatus.connected, false);
+  assert.match(second.gladys.fake.connectionStatus.message.en, /first reading is at/);
+});
+
+test('the end of a pause set by a command shows in the status (R2)', async () => {
+  const api = createFakeTrmnl();
+  const { gladys, clock } = await setup({ config: { allow_sleep_mode: true }, api });
+  api.next.push(() => answer(503, 'down'));
+  await press(gladys, 'sleep_mode_on');
+  await clock.settle();
+  assert.match(gladys.fake.connectionStatus.message.en, /paused until 12:05 UTC/);
+  await clock.advance(TIMINGS.pause5xx);
+  assert.equal(gladys.fake.connectionStatus.connected, false);
+  assert.equal(
+    gladys.fake.connectionStatus.message.en,
+    'The pause asked by TRMNL is over: next reading at 12:15 UTC.',
+  );
+  assert.equal(api.reads().length, 1);
+  await clock.advance(INTERVAL - TIMINGS.pause5xx);
+  assert.equal(api.reads().length, 2);
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
 test('another display under the same id (MAC differs): nothing written', async () => {
   const api = createFakeTrmnl();
   const { gladys } = await setup({ config: { allow_sleep_mode: true }, api });

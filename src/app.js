@@ -195,6 +195,10 @@ export class TrmnlApp {
       this.flushHandle = undefined;
       this.pending = false;
     }
+    if (this.pauseHandle !== undefined) {
+      this.timers.clearTimeout(this.pauseHandle);
+      this.pauseHandle = undefined;
+    }
   }
 
   saveNow() {
@@ -228,6 +232,10 @@ export class TrmnlApp {
       // Another key may be another account: its displays come with its first reading.
       this.data.devices = Object.create(null);
       this.lastDevices = undefined;
+      // The last success was of the previous key: a restart before the first
+      // reading of this one must not claim "connected".
+      this.data.okAt = null;
+      await this.saveNow();
     }
     this.activeKey = this.config.ready ? this.config.apiKey : undefined;
     if (!this.config.apiKey) {
@@ -318,6 +326,18 @@ export class TrmnlApp {
         this.phase = 'paused';
         this.plan(this.earliest(this.config.intervalMs));
       }
+      // At the end of the pause the status says so (the reading comes later).
+      if (this.pauseHandle !== undefined) {
+        this.timers.clearTimeout(this.pauseHandle);
+      }
+      const generation = this.generation;
+      this.pauseHandle = this.timers.setTimeout(
+        () => {
+          this.pauseHandle = undefined;
+          this.updateStatus(generation).catch(() => {});
+        },
+        Math.max(0, until - this.now()),
+      );
       return this.saveNow();
     }
     return Promise.resolve();
@@ -898,6 +918,10 @@ export class TrmnlApp {
       case 'refused':
         return { connected: false, message: join(T.refused) };
       case 'paused':
+        if (!this.pausedUntil()) {
+          // The pause is over; the next reading (planned after it) says the rest.
+          return { connected: false, message: join(T.pauseOver(next)) };
+        }
         return {
           connected: false,
           message: join(

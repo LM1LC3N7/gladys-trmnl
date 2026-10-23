@@ -51,6 +51,11 @@ export const T = {
       `Waiting: the first reading is at ${clock(at)} (never faster than the refresh interval, restarts included).`,
       `En attente : première lecture à ${clock(at)} (jamais plus vite que l’intervalle de rafraîchissement, redémarrages compris).`,
     ),
+  pauseOver: (at) =>
+    both(
+      `The pause asked by TRMNL is over: next reading at ${clock(at)}.`,
+      `La pause demandée par TRMNL est terminée : prochaine lecture à ${clock(at)}.`,
+    ),
   offline: (error, at) =>
     both(
       `TRMNL cannot be reached (${error}): next try at ${clock(at)}.`,

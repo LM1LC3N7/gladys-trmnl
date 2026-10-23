@@ -10,6 +10,14 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- A container restarted soon after the API key was changed no longer shows
+  "connected" from the last reading of the previous key: it waits for the
+  first reading of the new one.
+- When a pause asked by TRMNL ends, the status says so and gives the time of
+  the next reading, instead of the end of the pause until that reading.
+
 ## [0.1.1] - 2026-10-22
 
 ### Added
