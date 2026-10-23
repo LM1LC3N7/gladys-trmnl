@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-23
+
 ### Fixed
 
 - A container restarted soon after the API key was changed no longer shows
@@ -42,5 +44,6 @@ the notes of the version's GitHub Release.
   within a budget of 240 per minute.
 - `LICENSE` (Apache-2.0) and `THIRD_PARTY_NOTICES.md`, copied into the image.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-trmnl/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-trmnl/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/LM1LC3N7/gladys-trmnl/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LM1LC3N7/gladys-trmnl/releases/tag/v0.1.1
